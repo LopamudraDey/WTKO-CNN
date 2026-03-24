@@ -1,7 +1,7 @@
 import pandas as pd
 
 # Read your existing results
-df = pd.read_csv("LSDSaliency_TopPositions.csv")
+df = pd.read_csv("LSD1Saliency_TopPositions.csv")
 
 # Flatten top_kmers and top_positions so each sequence has multiple rows per k-mer
 rows = []
@@ -19,7 +19,7 @@ for idx, row in df.iterrows():
         })
 
 df_flat = pd.DataFrame(rows)
-df_flat.to_csv("LSDSaliency_TopPositions_Flat.csv", index=False)
+df_flat.to_csv("LSD1Saliency_TopPositions_Flat.csv", index=False)
 print("Saved flattened saliency CSV as 'Saliency_TopPositions_Flat.csv'")
 
 import pandas as pd
@@ -33,8 +33,8 @@ import os
 # ------------------------------
 # Parameters
 # ------------------------------
-saliency_csv = "LSDSaliency_TopPositions_Flat.csv"  # your flattened CSV
-n_clusters = 10       # number of motif clusters
+saliency_csv = "LSD1Saliency_TopPositions_Flat.csv"  # your flattened CSV
+n_clusters = 6      # number of motif clusters 10 for Rela and 6 for LSD1
 kmer_length = 20      # k-mer length
 
 # Folder to save logos
@@ -94,7 +94,7 @@ for cluster_id in sorted(df_kmers['cluster'].unique()):
     consensus_list.append((cluster_id, motif, len(kmers_in_cluster)))
 
 df_motifs = pd.DataFrame(consensus_list, columns=['cluster','consensus','count'])
-df_motifs.to_csv("LSDMotif_Consensus.csv", index=False)
+df_motifs.to_csv("LSD1Motif_Consensus.csv", index=False)
 print("Consensus motifs saved to 'Motif_Consensus.csv'")
 print(df_motifs)
 # Save all kmers cluster-wise to FASTA for MEME
