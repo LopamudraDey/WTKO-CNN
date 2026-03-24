@@ -99,8 +99,8 @@ class SequenceModelWithAttention(nn.Module):
 ############################################
 # Load Data
 ############################################
-wt_df = pd.read_csv('WT_Fli_600.csv', delimiter=";")
-ko_df = pd.read_csv('KO_Fli_600.csv', delimiter=";")
+wt_df = pd.read_csv('RelaWT600.csv', delimiter=";")
+ko_df = pd.read_csv('RelaKO600.csv', delimiter=";")
 wt_df['label'] = 1
 ko_df['label'] = 0
 n = min(len(wt_df), len(ko_df))
@@ -139,7 +139,7 @@ accumulation_steps = 4
 train_acc_history = []
 test_acc_history = []
 best_test_acc = 0.0
-best_model_path = "Fli_model.pth"
+best_model_path = "Rela_model.pth"
 
 ############################################
 # Training Loop
@@ -213,7 +213,7 @@ plt.ylabel("Accuracy")
 plt.title("Training vs Testing Accuracy")
 plt.legend()
 plt.grid()
-plt.savefig("Fli_accuracy.png")
+plt.savefig("Rela_accuracy.png")
 plt.show()
 
 ############################################
@@ -252,7 +252,7 @@ cm = confusion_matrix(best_labels, best_preds)
 disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["KO","WT"])  # 0=KO, 1=WT
 disp.plot(cmap=plt.cm.Blues)
 plt.title("Confusion Matrix - Best Model")
-plt.savefig("conu_Fli.png")
+plt.savefig("conu_Rela.png")
 plt.show()
 
 # 2. Classification Report
