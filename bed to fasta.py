@@ -1,8 +1,10 @@
 import pandas as pd
+from pyfaidx import Fasta
 
-# Load your newly created BED files
-ko_bed = pd.read_csv('D:/GSE149836/RelaKO_specific_peaks.bed', sep='\t', names=['chrom', 'start', 'stop','s','sr','st'])
-wt_bed = pd.read_csv('D:/GSE149836/RelaWT_specific_peaks.bed', sep='\t', names=['chrom', 'start', 'stop','s','sr','st'])
+
+# Load BED files
+ko_bed = pd.read_csv('D:/GSE149836/RelaKO_specific_peaks.bed', sep='\t', names=['chrom', 'start', 'stop','f1','f2','f3'])
+wt_bed = pd.read_csv('D:/GSE149836/RelaWT_specific_peaks.bed', sep='\t', names=['chrom', 'start', 'stop','f1','f2','f3'])
 
 def center_and_expand(df, width=600):
     mid = (df['start'] + df['stop']) // 2
@@ -10,23 +12,22 @@ def center_and_expand(df, width=600):
     df['stop'] = mid + (width // 2)
     return df
 
-# Center them so the CNN has a consistent view
+# Center them 
 ko_bed_fixed = center_and_expand(ko_bed)
 wt_bed_fixed = center_and_expand(wt_bed)
 
-from pyfaidx import Fasta
-bed=ko_bed_fixed
-fasta_file = "D:/X-inactivation/mm10.fa"
-output_file = "D:/GSE149836/RelaKO600.csv"
-# --- Load genome ---
+
+bed =ko_bed_fixed     # (Run again for wt_bed_fixed)
+fasta_file = "mm10.fa"
+output_file = "RelaKO600.csv"   #(RelaWT600.csv)
+
+
+# Load genome 
 genome = Fasta(fasta_file)
 
-# --- Read BED file ---
-#bed = pd.read_csv(bed_file, sep="\t", header=None, comment='#')
-#bed = bed.sample(n=66000, random_state=42)
 bed.columns = ["chr", "start", "end"] + [f"col{i}" for i in range(3, len(bed.columns))]
 
-# --- Extract sequences ---
+# Extract sequences
 sequences = []
 for i, row in bed.iterrows():
     try:
