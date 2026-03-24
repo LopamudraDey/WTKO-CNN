@@ -95,8 +95,8 @@ class SequenceModelWithAttention(nn.Module):
 ############################################
 # Load Data
 ############################################
-wt_df = pd.read_csv('Eb3_WT_spe.csv', delimiter=";")
-ko_df = pd.read_csv('Eb3_KO_spe.csv', delimiter=";")
+wt_df = pd.read_csv('LSD_WT.csv', delimiter=";")
+ko_df = pd.read_csv('LSD_KO.csv', delimiter=";")
 wt_df['label'] = 1
 ko_df['label'] = 0
 n = min(len(wt_df), len(ko_df))
@@ -112,8 +112,8 @@ y_train = train_df['label'].values
 X_test = test_df['sequence'].values
 y_test = test_df['label'].values
 
-train_encoded = one_hot_encode(X_train, seq_length=500)
-test_encoded = one_hot_encode(X_test, seq_length=500)
+train_encoded = one_hot_encode(X_train, seq_length=600)
+test_encoded = one_hot_encode(X_test, seq_length=600)
 
 train_dataset = SequenceDataset(train_encoded, y_train)
 test_dataset = SequenceDataset(test_encoded, y_test)
@@ -122,13 +122,13 @@ train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False)
 
 model = SequenceModelWithAttention().to(device)
-model.load_state_dict(torch.load("Eb3_model.pth"))
+model.load_state_dict(torch.load("LSD1600final_model.pth"))
 model.eval()
 
 # ------------------------------
 # Function: compute saliency for a sequence
 # ------------------------------
-def compute_saliency(model, sequence, seq_length=500):
+def compute_saliency(model, sequence, seq_length=600):
     """
     sequence: string DNA sequence
     Returns:
@@ -181,8 +181,8 @@ def extract_top_kmers(sequence, saliency, k=12, top_n=5):
 # ------------------------------
 all_kmers = []
 for seq in X_test:
-    sal = compute_saliency(model, seq, seq_length=500)
-    kmers = extract_top_kmers(seq, sal, k=12, top_n=3)  # top 3 kmers per seq
+    sal = compute_saliency(model, seq, seq_length=600)
+    kmers = extract_top_kmers(seq, sal, k=10, top_n=3)  # top 3 kmers per seq
     all_kmers.extend(kmers)
 
 print(f"Extracted {len(all_kmers)} k-mers from test sequences.")
@@ -193,18 +193,18 @@ import pandas as pd
 import os
 
 # Create folder to save plots
-os.makedirs("Eb3Saliency_Plots", exist_ok=True)
+os.makedirs("LSD1Saliency_Plots", exist_ok=True)
 
 # Parameters
-k = 12
+k = 10
 top_n = 3  # top 3 positions per sequence
-save_csv_path = "LSDSaliency_TopPositions.csv"
+save_csv_path = "LSD1Saliency_TopPositions.csv"
 
 results = []
 
 # Loop over test sequences
 for idx, seq in enumerate(X_test):
-    saliency = compute_saliency(model, seq, seq_length=500)
+    saliency = compute_saliency(model, seq, seq_length=600)
     top_positions = np.argsort(saliency)[-top_n:]
     
     # Extract k-mers at top positions
@@ -233,12 +233,12 @@ for idx, seq in enumerate(X_test):
     plt.legend()
     plt.grid()
     plt.tight_layout()
-    plt.savefig(f"Eb3Saliency_Plots/Sequence_{idx}_saliency.png")
+    plt.savefig(f"LSD1Saliency_Plots/Sequence_{idx}_saliency.png")
     plt.close()
 
 # Save all results to CSV
 df_results = pd.DataFrame(results)
 df_results.to_csv(save_csv_path, index=False)
 
-print(f"Saliency plots saved to 'Eb3Saliency_Plots/' folder")
+print(f"Saliency plots saved to 'LSD1Saliency_Plots/' folder")
 print(f"Top positions and k-mers saved to {save_csv_path}")
