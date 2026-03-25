@@ -1,3 +1,13 @@
+
+<img width="1736" height="635" alt="saliancy2" src="https://github.com/user-attachments/assets/53f28554-9113-4d96-aca3-240eb79bbc73" />
+
+
+
+
+
+
+
+
 # Get the WT and KO Peaks
 Relapeaks.py
 # Generate 600 bp Peak files and extract the sequences
