@@ -1,7 +1,7 @@
+# WTKO-CNN Model Architecture
 
-<img width="1736" height="635" alt="saliancy2" src="https://github.com/user-attachments/assets/53f28554-9113-4d96-aca3-240eb79bbc73" />
 
-
+<img width="1771" height="581" alt="workflow3" src="https://github.com/user-attachments/assets/8076b561-d5d5-425e-98c6-c64738fe5ef2" />
 
 
 
