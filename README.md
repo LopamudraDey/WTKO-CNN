@@ -37,4 +37,4 @@ Meme command : meme LSDcluster_3.fasta -dna -oc Lsdclus2_output -nmotifs 5 -minw
 
 # Apply TOMTOM Command to report statistically significant similarities based on Pearson correlation
 
-tomtom -oc LSDclus2_tomtom_try_output -dist pearson -thresh 0.5 Lsdclus2_output/meme.txt /mnt/c/Users/lopde33/Jasper/combined.meme
+tomtom -oc LSDclus2_tomtom_try_output -dist pearson -thresh 0.5 Lsdclus2_output/meme.txt /mnt/c/Jasper/combined.meme
