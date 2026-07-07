@@ -9,6 +9,9 @@
 
 
 # Get the WT and KO Peaks
+conda install -c bioconda bedtools
+bedtools intersect -v -a wt.bed -b ko.bed > wtspecific.bed
+bedtools intersect -v -a ko.bed -b wt.bed > kospecific.bed
 Relapeaks.py
 # Generate 600 bp Peak files and extract the sequences
 bed to fasta.py
