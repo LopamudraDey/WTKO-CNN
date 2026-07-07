@@ -10,9 +10,13 @@
 
 # Get the WT and KO Peaks
 conda install -c bioconda bedtools
+
 WT-specific regions
+
 bedtools intersect -v -a wt.bed -b ko.bed > wtspecific.bed
+
 KO-specific regions
+
 bedtools intersect -v -a ko.bed -b wt.bed > kospecific.bed
 
 Relapeaks.py
