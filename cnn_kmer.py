@@ -272,7 +272,7 @@ for f in range(num_filters):
 
 df_results = pd.DataFrame(results)
 
-df_results.to_csv("cnn_filter_Kmers_LSD.csv",index=False)
+df_results.to_csv("cnn_filter_Kmers_RelA.csv",index=False)
 
 print(df_results.head())
 
