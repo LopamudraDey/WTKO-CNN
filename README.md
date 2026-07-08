@@ -63,10 +63,6 @@ do
         -minw 6 \
         -maxw 12 \
         -mod zoops
-done
-
-# For Discriminative Kmers from CNN Filters: cnn_kmer.py
-Extract Discriminating Kmers from Best Model CNN Kernels.
 
     tomtom \
         -oc "${name}_tomtom" \
@@ -75,3 +71,7 @@ Extract Discriminating Kmers from Best Model CNN Kernels.
         "${name}_output/meme.txt" \
         /mnt/c/Jasper/combined.meme
 done
+
+# For Discriminative Kmers from CNN Filters: cnn_kmer.py
+Extract Discriminating Kmers from Best Model CNN Kernels.
+
