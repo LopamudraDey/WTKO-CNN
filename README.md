@@ -9,7 +9,7 @@
 # Running Instructions for WTKO_CNN Pipeline:
 conda install -c bioconda bedtools
 
-python WTKO_CNN.py --wt.bed WT.bed --ko.bed KO.bed --genome mm10.fa --outdirt Results
+python WTKO_CNN.py --wt.bed WT.bed --ko.bed KO.bed --genome mm10.fa --outdir Results
 
 Internally, the pipeline will do the following operations:
 
