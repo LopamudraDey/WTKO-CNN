@@ -7,9 +7,13 @@
 
 
 # Running Instructions for WTKO_CNN Pipeline:
+
 conda install -c bioconda bedtools
+
 Download WTKO_CNN Folder and unzip it.
+
 Then Run: 
+
 Please install mm10.fa or any other genome as per requirement
 
 
