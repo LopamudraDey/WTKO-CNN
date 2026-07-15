@@ -86,7 +86,7 @@ do
 done
 
 # Overview of Data used for Training and Testing
-The datasets are included in the repository. I have considered 3 Datasets from discriminating motif analysis.
+The datasets are included in the repository. I have considered 3 Datasets for discriminating motif analysis (DatasetAll.zip).
 
 # Overview of Results
 Visualization for convolution filters and results from MEME and Tomtom are saved in Supplementary.zip
