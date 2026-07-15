@@ -6,7 +6,7 @@
 
 
 
-# Running Instructions for WTKO_CNN Pipeline:
+# Running Procedure pf WTKO-CNN Pipeline:
 
 conda install -c bioconda bedtools
 
@@ -14,7 +14,7 @@ Download WTKO_CNN Folder and unzip it.
 
 Then Run: 
 
-Please install mm10.fa or any other genome as per requirement
+Install mm10.fa or any other genome as per requirement
 
 
 python WTKO_CNN.py --wt.bed WT.bed --ko.bed KO.bed --genome mm10.fa --outdir Results
@@ -84,6 +84,13 @@ do
         "${name}_output/meme.txt" \
         /mnt/c/Jasper/combined.meme
 done
+
+# Overview of Data used for Training and Testing
+The datasets are included in the repository. I have considered 3 Datasets from discriminating motif analysis.
+
+# Overview of Results
+Visualization for convolution filters and results from MEME and Tomtom are saved in Supplementary.zip
+
 
 # For Discriminative Kmers from CNN Filters: cnn_kmer.py
 Extract Discriminating Kmers from Best Model CNN Kernels.
