@@ -10,12 +10,10 @@
 
 conda install -c bioconda bedtools
 
-Download WTKO_CNN Folder and unzip it.
+Download WTKO_CNN Folder.
+Install mm10.fa or any other genome as per requirement.
 
 Then Run: 
-
-Install mm10.fa or any other genome as per requirement
-
 
 python WTKO_CNN.py --wt.bed WT.bed --ko.bed KO.bed --genome mm10.fa --outdir Results
 
