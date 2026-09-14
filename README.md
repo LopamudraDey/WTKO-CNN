@@ -6,7 +6,7 @@
 
 
 
-# Running Procedure pf WTKO-CNN Pipeline:
+# Running Procedure of WTKO-CNN Pipeline:
 
 conda install -c bioconda bedtools
 
