@@ -1,3 +1,10 @@
+
+import os
+import random
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,27 +13,32 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from torch.cuda.amp import autocast, GradScaler
 
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-
 from sklearn.metrics import (
     confusion_matrix,
     ConfusionMatrixDisplay,
-    classification_report
+    classification_report,
+    accuracy_score
 )
 
 
 ############################################
-# Device
+# Reproducibility and device
 ############################################
+
+def set_seed(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
 
 device = torch.device(
     "cuda" if torch.cuda.is_available() else "cpu"
 )
 
-torch.manual_seed(30)
-np.random.seed(30)
+print("Using device:", device)
 
 
 ############################################
@@ -62,55 +74,49 @@ class SequenceDataset(Dataset):
 ############################################
 
 nucleotides = {
-    'A': [1, 0, 0, 0],
-    'C': [0, 1, 0, 0],
-    'G': [0, 0, 1, 0],
-    'T': [0, 0, 0, 1],
-    'N': [0, 0, 0, 0]
+    "A": [1, 0, 0, 0],
+    "C": [0, 1, 0, 0],
+    "G": [0, 0, 1, 0],
+    "T": [0, 0, 0, 1],
+    "N": [0, 0, 0, 0]
 }
 
 
-def one_hot_encode(sequences, seq_length=None):
+def one_hot_encode(sequences, seq_length=600):
 
     encoded_sequences = []
 
     for seq in sequences:
 
-        seq = seq.upper()
+        seq = str(seq).upper()
 
         encoded = np.array(
             [
                 nucleotides.get(
-                    b,
+                    base,
                     [0, 0, 0, 0]
                 )
-                for b in seq
+                for base in seq
             ],
             dtype=np.float32
         )
 
-        if seq_length:
+        # Pad shorter sequences with zeros
+        if len(encoded) < seq_length:
 
-            if len(encoded) < seq_length:
+            padding = np.zeros(
+                (seq_length - len(encoded), 4),
+                dtype=np.float32
+            )
 
-                pad = np.zeros(
-                    (
-                        seq_length - len(encoded),
-                        4
-                    ),
-                    dtype=np.float32
-                )
+            encoded = np.vstack(
+                [encoded, padding]
+            )
 
-                encoded = np.vstack(
-                    [
-                        encoded,
-                        pad
-                    ]
-                )
+        # Truncate longer sequences
+        else:
 
-            else:
-
-                encoded = encoded[:seq_length]
+            encoded = encoded[:seq_length]
 
         encoded_sequences.append(encoded)
 
@@ -121,7 +127,7 @@ def one_hot_encode(sequences, seq_length=None):
 
 
 ############################################
-# Attention Layer
+# Attention layer
 ############################################
 
 class Attention1D(nn.Module):
@@ -153,7 +159,7 @@ class Attention1D(nn.Module):
 
 
 ############################################
-# CNN + Attention Model
+# CNN + Attention model
 ############################################
 
 class SequenceModelWithAttention(nn.Module):
@@ -163,8 +169,8 @@ class SequenceModelWithAttention(nn.Module):
         super().__init__()
 
         self.conv1 = nn.Conv1d(
-            4,
-            64,
+            in_channels=4,
+            out_channels=64,
             kernel_size=10
         )
 
@@ -173,8 +179,8 @@ class SequenceModelWithAttention(nn.Module):
         self.dropout1 = nn.Dropout(0.3)
 
         self.conv2 = nn.Conv1d(
-            64,
-            128,
+            in_channels=64,
+            out_channels=128,
             kernel_size=10
         )
 
@@ -196,11 +202,10 @@ class SequenceModelWithAttention(nn.Module):
 
     def forward(self, x):
 
-        x = x.permute(
-            0,
-            2,
-            1
-        )
+        # [batch, sequence length, channels]
+        # to [batch, channels, sequence length]
+
+        x = x.permute(0, 2, 1)
 
         x = self.pool1(
             F.relu(
@@ -218,11 +223,10 @@ class SequenceModelWithAttention(nn.Module):
 
         x = self.dropout2(x)
 
-        x = x.permute(
-            0,
-            2,
-            1
-        )
+        # [batch, channels, sequence length]
+        # to [batch, sequence length, channels]
+
+        x = x.permute(0, 2, 1)
 
         x, attn_weights = self.attn(x)
 
@@ -236,139 +240,288 @@ class SequenceModelWithAttention(nn.Module):
 
 
 ############################################
-# Load Data
+# Main training function
 ############################################
 
 def train_cnn_attention(
-        wt_file,
-        ko_file,
-        output_dir,
-        test_chromosomes=["chr6", "chr7"],
-        epochs=100,
-        batch_size=16,
-        seed=42,
-        class_names=["KO", "WT"]
+
+    wt_file,
+    ko_file,
+    output_dir,
+
+    validation_chromosome="chr5",
+    test_chromosomes=("chr6", "chr7"),
+
+    epochs=100,
+    batch_size=16,
+    learning_rate=0.001,
+
+    sequence_length=600,
+    seed=42,
+
+    class_names=("KO", "WT")
 ):
 
-    import os
+    ########################################
+    # Create output directory
+    ########################################
 
     os.makedirs(
         output_dir,
         exist_ok=True
     )
 
-    ##################################
-    # Random seed
-    ##################################
+    set_seed(seed)
 
-    torch.manual_seed(seed)
-    np.random.seed(seed)
+    ########################################
+    # Load WT and KO data
+    ########################################
 
-    ##################################
-    # Load WT/KO sequences
-    ##################################
+    wt_df = pd.read_csv(wt_file)
+    ko_df = pd.read_csv(ko_file)
 
-    wt_df = pd.read_csv(
-        wt_file
-    )
-
-    ko_df = pd.read_csv(
-        ko_file
-    )
+    # Standardize chromosome column name
 
     wt_df = wt_df.rename(
-        columns={
-            "chr": "chrom"
-        }
+        columns={"chr": "chrom"}
     )
 
     ko_df = ko_df.rename(
-        columns={
-            "chr": "chrom"
-        }
+        columns={"chr": "chrom"}
     )
+
+    # Check required columns
+
+    required_columns = ["chrom", "sequence"]
+
+    for column in required_columns:
+
+        if column not in wt_df.columns:
+            raise ValueError(
+                f"WT file is missing column: {column}"
+            )
+
+        if column not in ko_df.columns:
+            raise ValueError(
+                f"KO file is missing column: {column}"
+            )
+
+    # Assign labels
+    # KO = 0
+    # WT = 1
 
     wt_df["label"] = 1
     ko_df["label"] = 0
 
-    ##################################
-    # Balance classes
-    ##################################
+    # Remove missing sequences and chromosomes
+
+    wt_df = wt_df.dropna(
+        subset=["sequence", "chrom"]
+    ).copy()
+
+    ko_df = ko_df.dropna(
+        subset=["sequence", "chrom"]
+    ).copy()
+
+    ########################################
+    # Balance WT and KO classes
+    ########################################
 
     n = min(
         len(wt_df),
         len(ko_df)
     )
 
-    df = pd.concat(
-        [
-            wt_df.sample(
-                n,
-                random_state=seed
-            ),
+    if n == 0:
+        raise ValueError(
+            "No WT or KO sequences available."
+        )
 
-            ko_df.sample(
-                n,
-                random_state=seed
-            )
-
-        ]
-    ).reset_index(drop=True)
-
-    df = df.dropna(
-        subset=["sequence"]
+    wt_df = wt_df.sample(
+        n=n,
+        random_state=seed
     )
 
-    ##################################
-    # Chromosome split
-    ##################################
+    ko_df = ko_df.sample(
+        n=n,
+        random_state=seed
+    )
+
+    df = pd.concat(
+        [wt_df, ko_df],
+        ignore_index=True
+    )
+
+    ########################################
+    # Chromosome-level data partitioning
+    ########################################
+
+    validation_chromosomes = [
+        validation_chromosome
+    ]
+
+    test_chromosomes = list(
+        test_chromosomes
+    )
+
+    # Ensure validation and test chromosomes
+    # are not overlapping
+
+    if set(validation_chromosomes).intersection(
+        set(test_chromosomes)
+    ):
+        raise ValueError(
+            "Validation and test chromosomes overlap."
+        )
+
+    # Training set:
+    # All chromosomes except validation and test
+
+    excluded_chromosomes = (
+        validation_chromosomes + test_chromosomes
+    )
 
     train_df = df[
-        ~df.chrom.isin(test_chromosomes)
-    ]
+        ~df["chrom"].isin(excluded_chromosomes)
+    ].copy()
+
+    # Validation set
+
+    val_df = df[
+        df["chrom"].isin(validation_chromosomes)
+    ].copy()
+
+    # Independent test set
 
     test_df = df[
-        df.chrom.isin(test_chromosomes)
-    ]
+        df["chrom"].isin(test_chromosomes)
+    ].copy()
 
-    ##################################
-    # Encoding
-    ##################################
+    ########################################
+    # Check data partitions
+    ########################################
+
+    if len(train_df) == 0:
+        raise ValueError("Training set is empty.")
+
+    if len(val_df) == 0:
+        raise ValueError("Validation set is empty.")
+
+    if len(test_df) == 0:
+        raise ValueError("Test set is empty.")
+
+    # Check that both classes are represented
+    # in each partition
+
+    for name, subset in [
+        ("Training", train_df),
+        ("Validation", val_df),
+        ("Test", test_df)
+    ]:
+
+        class_counts = subset["label"].value_counts()
+
+        print(
+            f"\n{name} set:"
+        )
+
+        print(
+            "Number of sequences:",
+            len(subset)
+        )
+
+        print(
+            "KO sequences:",
+            int(class_counts.get(0, 0))
+        )
+
+        print(
+            "WT sequences:",
+            int(class_counts.get(1, 0))
+        )
+
+        if set(subset["label"].unique()) != {0, 1}:
+            raise ValueError(
+                f"{name} set does not contain both WT and KO classes. "
+                "Choose a different chromosome partition."
+            )
+
+    ########################################
+    # Extract sequences and labels
+    ########################################
+
+    X_train = train_df["sequence"].values
+    y_train = train_df["label"].values
+
+    X_val = val_df["sequence"].values
+    y_val = val_df["label"].values
+
+    X_test = test_df["sequence"].values
+    y_test = test_df["label"].values
+
+    ########################################
+    # One-hot encoding
+    ########################################
 
     X_train = one_hot_encode(
-        train_df.sequence.values,
-        seq_length=600
+        X_train,
+        seq_length=sequence_length
+    )
+
+    X_val = one_hot_encode(
+        X_val,
+        seq_length=sequence_length
     )
 
     X_test = one_hot_encode(
-        test_df.sequence.values,
-        seq_length=600
+        X_test,
+        seq_length=sequence_length
     )
 
-    y_train = train_df.label.values
-    y_test = test_df.label.values
+    ########################################
+    # Create datasets
+    ########################################
+
+    train_dataset = SequenceDataset(
+        X_train,
+        y_train
+    )
+
+    val_dataset = SequenceDataset(
+        X_val,
+        y_val
+    )
+
+    test_dataset = SequenceDataset(
+        X_test,
+        y_test
+    )
+
+    ########################################
+    # Create data loaders
+    ########################################
 
     train_loader = DataLoader(
-        SequenceDataset(
-            X_train,
-            y_train
-        ),
+        train_dataset,
         batch_size=batch_size,
         shuffle=True
     )
 
-    test_loader = DataLoader(
-        SequenceDataset(
-            X_test,
-            y_test
-        ),
+    val_loader = DataLoader(
+        val_dataset,
         batch_size=batch_size,
         shuffle=False
     )
 
-    ##################################
-    # Model
-    ##################################
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=batch_size,
+        shuffle=False
+    )
+
+    ########################################
+    # Initialize model
+    ########################################
 
     model = SequenceModelWithAttention().to(device)
 
@@ -376,40 +529,57 @@ def train_cnn_attention(
 
     optimizer = optim.Adam(
         model.parameters(),
-        lr=0.001
+        lr=learning_rate
     )
 
     scaler = GradScaler(
         enabled=torch.cuda.is_available()
     )
 
-    best_acc = 0
+    ########################################
+    # Model saving
+    ########################################
 
     model_path = os.path.join(
         output_dir,
         "best_model.pth"
     )
 
-    train_acc_history = []
-    test_acc_history = []
+    best_val_acc = -1.0
+    best_epoch = 0
 
-    ##################################
-    # Training
-    ##################################
+    ########################################
+    # Accuracy histories
+    ########################################
+
+    train_acc_history = []
+    val_acc_history = []
+
+    train_loss_history = []
+    val_loss_history = []
+
+    ########################################
+    # Training loop
+    ########################################
 
     for epoch in range(epochs):
 
+        ####################################
+        # Training
+        ####################################
+
         model.train()
 
-        correct = 0
-        total = 0
-
-        optimizer.zero_grad()
+        correct_train = 0
+        total_train = 0
+        running_train_loss = 0.0
 
         for inputs, labels in train_loader:
 
             inputs = inputs.to(device)
             labels = labels.to(device)
+
+            optimizer.zero_grad()
 
             with autocast(
                 enabled=torch.cuda.is_available()
@@ -422,91 +592,143 @@ def train_cnn_attention(
                     labels
                 )
 
-            scaler.scale(
-                loss
-            ).backward()
+            scaler.scale(loss).backward()
 
-            scaler.step(
-                optimizer
-            )
+            scaler.step(optimizer)
 
             scaler.update()
 
-            optimizer.zero_grad()
+            running_train_loss += loss.item()
 
-            _, pred = torch.max(
+            _, predicted = torch.max(
                 outputs,
-                1
+                dim=1
             )
 
-            correct += (
-                pred == labels
+            correct_train += (
+                predicted == labels
             ).sum().item()
 
-            total += labels.size(0)
+            total_train += labels.size(0)
 
-        train_acc = correct / total
+        train_acc = (
+            correct_train / total_train
+        )
 
-        ##################################
+        train_loss = (
+            running_train_loss / len(train_loader)
+        )
+
+        ####################################
         # Validation
-        ##################################
+        ####################################
 
         model.eval()
 
-        correct = 0
-        total = 0
+        correct_val = 0
+        total_val = 0
+        running_val_loss = 0.0
 
         with torch.no_grad():
 
-            for inputs, labels in test_loader:
+            for inputs, labels in val_loader:
 
                 inputs = inputs.to(device)
                 labels = labels.to(device)
 
-                outputs, _ = model(inputs)
+                with autocast(
+                    enabled=torch.cuda.is_available()
+                ):
 
-                _, pred = torch.max(
+                    outputs, _ = model(inputs)
+
+                    loss = criterion(
+                        outputs,
+                        labels
+                    )
+
+                running_val_loss += loss.item()
+
+                _, predicted = torch.max(
                     outputs,
-                    1
+                    dim=1
                 )
 
-                correct += (
-                    pred == labels
+                correct_val += (
+                    predicted == labels
                 ).sum().item()
 
-                total += labels.size(0)
+                total_val += labels.size(0)
 
-        test_acc = correct / total
-
-        train_acc_history.append(train_acc)
-        test_acc_history.append(test_acc)
-
-        print(
-            f"Epoch {epoch+1}/{epochs} "
-            f"Train={train_acc:.3f} "
-            f"Test={test_acc:.3f}"
+        val_acc = (
+            correct_val / total_val
         )
 
-        if test_acc > best_acc:
+        val_loss = (
+            running_val_loss / len(val_loader)
+        )
 
-            best_acc = test_acc
+        ####################################
+        # Store accuracy and loss
+        ####################################
+
+        train_acc_history.append(train_acc)
+        val_acc_history.append(val_acc)
+
+        train_loss_history.append(train_loss)
+        val_loss_history.append(val_loss)
+
+        ####################################
+        # Print epoch results
+        ####################################
+
+        print(
+            f"Epoch {epoch + 1}/{epochs} | "
+            f"Train Loss: {train_loss:.4f} | "
+            f"Train Acc: {train_acc:.4f} | "
+            f"Validation Loss: {val_loss:.4f} | "
+            f"Validation Acc: {val_acc:.4f}"
+        )
+
+        ####################################
+        # Save best model based ONLY
+        # on validation accuracy
+        ####################################
+
+        if val_acc > best_val_acc:
+
+            best_val_acc = val_acc
+            best_epoch = epoch + 1
 
             torch.save(
                 model.state_dict(),
                 model_path
             )
 
+    ########################################
+    # End of training
+    ########################################
+
+    print("\nTraining completed.")
+
+    print(
+        "Best validation accuracy:",
+        round(best_val_acc, 4)
+    )
+
+    print(
+        "Best epoch:",
+        best_epoch
+    )
+
     print(
         "Best model saved:",
         model_path
     )
 
-    ##################################
-    # Accuracy plot
-    ##################################
-
-    best_epoch = np.argmax(test_acc_history) + 1
-    best_acc = test_acc_history[best_epoch - 1]
+    ########################################
+    # Plot training and validation accuracy
+    ########################################
 
     accuracy_plot_path = os.path.join(
         output_dir,
@@ -518,36 +740,79 @@ def train_cnn_attention(
     plt.plot(
         range(1, epochs + 1),
         train_acc_history,
-        label="Train Accuracy"
+        label="Training Accuracy"
     )
 
     plt.plot(
         range(1, epochs + 1),
-        test_acc_history,
-        label="Test Accuracy"
+        val_acc_history,
+        label="Validation Accuracy"
     )
 
     plt.scatter(
         best_epoch,
-        best_acc,
+        best_val_acc,
         color="red",
-        label=f"Best {best_acc*100:.2f}%"
+        label=f"Best Validation: {best_val_acc * 100:.2f}%"
     )
 
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy")
-    plt.title("Training vs Testing Accuracy")
+    plt.title("Training and Validation Accuracy")
+
     plt.legend()
     plt.grid()
 
-    plt.savefig(accuracy_plot_path)
+    plt.savefig(
+        accuracy_plot_path,
+        dpi=300,
+        bbox_inches="tight"
+    )
+
     plt.close()
 
-    print("Accuracy plot saved:", accuracy_plot_path)
+    ########################################
+    # Plot training and validation loss
+    ########################################
 
-    ##################################
-    # Reload best model for evaluation
-    ##################################
+    loss_plot_path = os.path.join(
+        output_dir,
+        "loss.png"
+    )
+
+    plt.figure(figsize=(10, 5))
+
+    plt.plot(
+        range(1, epochs + 1),
+        train_loss_history,
+        label="Training Loss"
+    )
+
+    plt.plot(
+        range(1, epochs + 1),
+        val_loss_history,
+        label="Validation Loss"
+    )
+
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.title("Training and Validation Loss")
+
+    plt.legend()
+    plt.grid()
+
+    plt.savefig(
+        loss_plot_path,
+        dpi=300,
+        bbox_inches="tight"
+    )
+
+    plt.close()
+
+    ########################################
+    # Load best model selected using
+    # validation accuracy
+    ########################################
 
     model.load_state_dict(
         torch.load(
@@ -557,6 +822,13 @@ def train_cnn_attention(
     )
 
     model.eval()
+
+    ########################################
+    # Independent test evaluation
+    #
+    # The test set is evaluated only here,
+    # after model selection is complete.
+    ########################################
 
     all_preds = []
     all_labels = []
@@ -569,26 +841,43 @@ def train_cnn_attention(
 
             outputs, _ = model(inputs)
 
-            _, pred = torch.max(
+            _, predicted = torch.max(
                 outputs,
-                1
+                dim=1
             )
 
             all_preds.extend(
-                pred.cpu().numpy()
+                predicted.cpu().numpy()
             )
 
             all_labels.extend(
                 labels.numpy()
             )
 
-    ##################################
+    ########################################
+    # Final test accuracy
+    ########################################
+
+    test_acc = accuracy_score(
+        all_labels,
+        all_preds
+    )
+
+    print("\nIndependent test results")
+
+    print(
+        "Test accuracy:",
+        round(test_acc, 4)
+    )
+
+    ########################################
     # Confusion matrix
-    ##################################
+    ########################################
 
     cm = confusion_matrix(
         all_labels,
-        all_preds
+        all_preds,
+        labels=[0, 1]
     )
 
     confusion_matrix_path = os.path.join(
@@ -601,31 +890,41 @@ def train_cnn_attention(
         display_labels=class_names
     )
 
-    disp.plot(cmap=plt.cm.Blues)
+    disp.plot(
+        cmap=plt.cm.Blues
+    )
 
-    plt.title("Confusion Matrix - Best Model")
+    plt.title(
+        "Confusion Matrix - Independent Test Set"
+    )
 
-    plt.savefig(confusion_matrix_path)
+    plt.savefig(
+        confusion_matrix_path,
+        dpi=300,
+        bbox_inches="tight"
+    )
+
     plt.close()
 
-    print("Confusion matrix saved:", confusion_matrix_path)
-
-    ##################################
+    ########################################
     # Classification report
-    # (precision, recall, f1-score)
-    ##################################
+    ########################################
 
     report_text = classification_report(
         all_labels,
         all_preds,
-        target_names=class_names
+        labels=[0, 1],
+        target_names=class_names,
+        zero_division=0
     )
 
     report_dict = classification_report(
         all_labels,
         all_preds,
+        labels=[0, 1],
         target_names=class_names,
-        output_dict=True
+        output_dict=True,
+        zero_division=0
     )
 
     classification_report_path = os.path.join(
@@ -633,22 +932,136 @@ def train_cnn_attention(
         "classification_report.txt"
     )
 
-    with open(classification_report_path, "w") as f:
-        f.write("Classification Report (Best Model):\n\n")
+    with open(
+        classification_report_path,
+        "w"
+    ) as f:
+
+        f.write(
+            "Classification Report - Independent Test Set\n\n"
+        )
+
         f.write(report_text)
 
-    print("\nClassification Report (Best Model):\n")
+        f.write(
+            f"\nIndependent test accuracy: {test_acc:.4f}\n"
+        )
+
+        f.write(
+            f"Best validation accuracy: {best_val_acc:.4f}\n"
+        )
+
+        f.write(
+            f"Best epoch: {best_epoch}\n"
+        )
+
+    print(
+        "\nClassification Report - Independent Test Set:\n"
+    )
+
     print(report_text)
 
-    print("Classification report saved:", classification_report_path)
+    ########################################
+    # Save training history
+    ########################################
+
+    history_df = pd.DataFrame({
+
+        "epoch": range(1, epochs + 1),
+
+        "training_accuracy": train_acc_history,
+
+        "validation_accuracy": val_acc_history,
+
+        "training_loss": train_loss_history,
+
+        "validation_loss": val_loss_history
+
+    })
+
+    history_path = os.path.join(
+        output_dir,
+        "training_history.csv"
+    )
+
+    history_df.to_csv(
+        history_path,
+        index=False
+    )
+
+    ########################################
+    # Return results
+    ########################################
 
     return {
+
         "model_path": model_path,
-        "best_acc": best_acc,
+
+        "best_epoch": best_epoch,
+
+        "best_validation_accuracy": best_val_acc,
+
+        "independent_test_accuracy": test_acc,
+
         "accuracy_plot_path": accuracy_plot_path,
+
+        "loss_plot_path": loss_plot_path,
+
         "confusion_matrix_path": confusion_matrix_path,
+
         "classification_report_path": classification_report_path,
+
         "classification_report": report_dict,
+
         "train_acc_history": train_acc_history,
-        "test_acc_history": test_acc_history
+
+        "val_acc_history": val_acc_history,
+
+        "train_loss_history": train_loss_history,
+
+        "val_loss_history": val_loss_history,
+
+        "history_path": history_path
     }
+
+
+############################################
+# Run the model
+############################################
+
+if __name__ == "__main__":
+
+    results = train_cnn_attention(
+
+        wt_file="RelaWT600.csv",
+
+        ko_file="RelaKO600.csv",
+
+        output_dir="WTKO_CNN_RelA_results",
+
+        validation_chromosome="chr5",
+
+        test_chromosomes=("chr6", "chr7"),
+
+        epochs=100,
+
+        batch_size=16,
+
+        learning_rate=0.001,
+
+        sequence_length=600,
+
+        seed=42
+    )
+
+    print("\nFinal results:")
+
+    print(
+        "Best validation accuracy:",
+        results["best_validation_accuracy"]
+    )
+
+    print(
+        "Independent test accuracy:",
+        results["independent_test_accuracy"]
+    )
