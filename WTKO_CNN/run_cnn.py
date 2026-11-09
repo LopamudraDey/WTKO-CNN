@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
     model_path = result["model_path"]
 
-    best_acc = result["best_acc"]
+    best_acc = result["best_validation_accuracy"]
 
     accuracy_plot = result["accuracy_plot_path"]
 
