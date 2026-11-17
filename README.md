@@ -11,9 +11,12 @@
 conda install -c bioconda bedtools
 
 Download WTKO_CNN Folder.
+
 Install mm10.fa or any other genome as per requirement.
 
-Then Run: 
+The pipeline accepts WT and KO BED files as input, allowing
+researchers to apply the analytical workflow without implementing the individual computational steps from scratch.
+ Command to Execute the Pipeline: 
 
 python WTKO_CNN.py --wt.bed WT.bed --ko.bed KO.bed --genome mm10.fa --outdir Results
 
