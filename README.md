@@ -15,7 +15,7 @@ Download WTKO_CNN Folder.
 Install mm10.fa or any other genome as per requirement.
 
 The pipeline accepts WT and KO BED files as input, allowing
-researchers to apply the analytical workflow without implementing the individual computational steps from scratch.
+researchers to apply the analytical workflow without implementing the individual computational steps from scratch. Here WT.bed and KO.bed are the input WT and KO ATAC-seq BED files.
  Command to Execute the Pipeline: 
 
 python WTKO_CNN.py --wt.bed WT.bed --ko.bed KO.bed --genome mm10.fa --outdir Results
